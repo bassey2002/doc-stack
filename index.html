@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>DocSuite — PDF Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --surface: #161619;
+      --surface2: #1e1e23;
+      --border: #2a2a33;
+      --accent: #e8ff47;
+      --accent2: #47c8ff;
+      --text: #f0f0f0;
+      --muted: #6b6b80;
+    }
+
+    html, body {
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      padding-top: max(40px, env(safe-area-inset-top));
+      padding-bottom: max(40px, env(safe-area-inset-bottom));
+      gap: 48px;
+    }
+
+    /* ── Brand ── */
+    .brand {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(32px, 8vw, 52px);
+      letter-spacing: -2px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-pill {
+      background: var(--accent);
+      color: #0d0d0f;
+      font-size: clamp(10px, 2vw, 13px);
+      font-family: 'DM Mono', monospace;
+      font-weight: 400;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 20px;
+      vertical-align: middle;
+    }
+
+    .brand-sub {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Cards ── */
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    @media (max-width: 480px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      display: block;
+      text-decoration: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px;
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      border-radius: 16px;
+    }
+
+    .card-stack::before {
+      background: radial-gradient(ellipse at top left, rgba(232,255,71,0.07), transparent 70%);
+    }
+
+    .card-mark::before {
+      background: radial-gradient(ellipse at top left, rgba(71,200,255,0.07), transparent 70%);
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+    }
+
+    .card:hover::before { opacity: 1; }
+
+    .card-stack:hover { border-color: var(--accent); }
+    .card-mark:hover  { border-color: var(--accent2); }
+
+    .card-icon {
+      font-size: 36px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .card-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .card-stack .card-name { color: var(--accent); }
+    .card-mark  .card-name { color: var(--accent2); }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .card-arrow {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      font-size: 18px;
+      opacity: 0;
+      transform: translateX(-4px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .card-stack .card-arrow { color: var(--accent); }
+    .card-mark  .card-arrow { color: var(--accent2); }
+
+    .card:hover .card-arrow {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* ── Features row ── */
+    .features {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 560px;
+    }
+
+    .feat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .feat-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ── */
+    footer {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      opacity: 0.5;
+    }
+
+    /* ── Animations ── */
+    .brand { animation: fadeUp 0.5s ease both; }
+    .cards { animation: fadeUp 0.5s 0.1s ease both; }
+    .features { animation: fadeUp 0.5s 0.2s ease both; }
+    footer { animation: fadeUp 0.5s 0.3s ease both; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="brand">
+    <div class="brand-logo">
+      DocSuite <span class="logo-pill">PDF Tools</span>
+    </div>
+    <p class="brand-sub">Everything runs in your browser. Nothing leaves your device.</p>
+  </div>
+
+  <div class="cards">
+    <a class="card card-stack" href="docstack.html">
+      <span class="card-icon">📄</span>
+      <div class="card-name">DocStack</div>
+      <p class="card-desc">Merge PDFs and images into one compiled document. Drag to reorder.</p>
+      <span class="card-arrow">→</span>
+    </a>
+
+    <a class="card card-mark" href="annotate.html">
+      <span class="card-icon">✏️</span>
+      <div class="card-name">DocMark</div>
+      <p class="card-desc">Annotate PDFs with signatures, text, stamps and drawings. Export ready.</p>
+      <span class="card-arrow">→</span>
+    </a>
+  </div>
+
+  <div class="features">
+    <div class="feat"><div class="feat-dot"></div>100% offline</div>
+    <div class="feat"><div class="feat-dot"></div>No sign-up</div>
+    <div class="feat"><div class="feat-dot"></div>Mobile friendly</div>
+    <div class="feat"><div class="feat-dot"></div>Free forever</div>
+  </div>
+
+  <footer>DocSuite · All processing done locally in your browser</footer>
+
+</body>
+</html>

@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>DocStack — Document Compiler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --surface: #161619;
+      --surface2: #1e1e23;
+      --border: #2a2a33;
+      --accent: #e8ff47;
+      --accent2: #47c8ff;
+      --text: #f0f0f0;
+      --muted: #6b6b80;
+      --danger: #ff5c5c;
+      --radius: 10px;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+      padding-top: max(16px, env(safe-area-inset-top));
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 20px;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-dot {
+      width: 10px; height: 10px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
+
+    .badge {
+      font-size: 11px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .suite-nav-link {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 20px;
+      transition: border-color 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+    .suite-nav-link:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    .suite-home-link {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 5px 4px;
+      transition: color 0.2s;
+      white-space: nowrap;
+    }
+    .suite-home-link:hover { color: var(--text); }
+
+    /* ── Main: single column on mobile, two-col on desktop ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    @media (min-width: 800px) {
+      main {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        align-items: start;
+      }
+    }
+
+    /* ── Left panel ── */
+    #left-panel {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    @media (min-width: 800px) {
+      #left-panel {
+        padding: 32px 32px 32px 40px;
+        position: sticky;
+        top: 57px;
+        max-height: calc(100dvh - 57px);
+        overflow-y: auto;
+      }
+    }
+
+    /* ── Drop Zone ── */
+    .upload-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      padding: 44px 24px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      background: var(--surface);
+    }
+
+    .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(232, 255, 71, 0.04);
+    }
+
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      font-size: 44px;
+      margin-bottom: 14px;
+      filter: grayscale(1) opacity(0.4);
+      transition: filter 0.2s;
+    }
+
+    .upload-zone:hover .upload-icon,
+    .upload-zone.drag-over .upload-icon { filter: none; }
+
+    .upload-zone h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .upload-zone p {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    .upload-zone .supported {
+      margin-top: 16px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .tag {
+      font-size: 10px;
+      padding: 3px 9px;
+      border-radius: 4px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    /* ── Document List ── */
+    #doc-list-container {
+      display: none;
+      flex-direction: column;
+    }
+
+    #doc-list-container.visible { display: flex; }
+
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .list-header h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .list-header span {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px;
+      display: block;
+    }
+
+    .add-more-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      position: relative;
+      overflow: hidden;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .add-more-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-more-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+    #doc-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .doc-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.15s, opacity 0.15s;
+      user-select: none;
+      touch-action: none; /* critical for touch drag */
+    }
+
+    .doc-item.dragging {
+      opacity: 0.4;
+    }
+
+    .doc-item.drag-target {
+      border-color: var(--accent2);
+      background: rgba(71, 200, 255, 0.05);
+    }
+
+    /* Touch drag ghost */
+    .drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.85;
+      border-radius: var(--radius);
+      background: var(--surface2);
+      border: 1px solid var(--accent2);
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      transform: scale(1.03);
+      max-width: calc(100vw - 40px);
+    }
+
+    .drag-handle {
+      color: var(--muted);
+      font-size: 18px;
+      flex-shrink: 0;
+      padding: 2px 4px;
+      cursor: grab;
+      /* larger touch target */
+      touch-action: none;
+    }
+
+    .doc-index {
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 20px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .doc-icon { font-size: 20px; flex-shrink: 0; }
+
+    .doc-info { flex: 1; overflow: hidden; }
+
+    .doc-name {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .doc-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .doc-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
+      /* big tap target */
+      min-width: 36px;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .doc-remove:hover { color: var(--danger); background: rgba(255,92,92,0.1); }
+
+    /* ── Sidebar / Bottom panel ── */
+    .sidebar {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+    }
+
+    @media (min-width: 800px) {
+      .sidebar {
+        border-top: none;
+        border-left: 1px solid var(--border);
+        padding: 32px 28px;
+        position: sticky;
+        top: 57px;
+        max-height: calc(100dvh - 57px);
+        overflow-y: auto;
+        gap: 24px;
+      }
+    }
+
+    .sidebar h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .field input[type="text"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+
+    .field input[type="text"]:focus { border-color: var(--accent); }
+    .field input[type="text"]::placeholder { color: var(--muted); }
+
+    .divider { height: 1px; background: var(--border); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: var(--accent);
+    }
+
+    .stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .convert-btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--accent);
+      color: #0d0d0f;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.3px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .convert-btn:active:not(:disabled) { transform: scale(0.98); }
+    .convert-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    #progress-wrap { display: none; }
+    #progress-wrap.visible { display: block; }
+
+    .progress-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .progress-bar-bg {
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 22px;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 9998;
+      white-space: nowrap;
+      max-width: calc(100vw - 40px);
+      text-align: center;
+    }
+
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: var(--accent); color: var(--accent); }
+    #toast.error { border-color: var(--danger); color: var(--danger); }
+
+    .hint { font-size: 11px; color: var(--muted); line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    DocStack
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a href="index.html" class="suite-home-link">⌂ Home</a>
+    <a href="annotate.html" class="suite-nav-link">DocMark →</a>
+  </div>
+</header>
+
+<main>
+  <!-- Left panel -->
+  <div id="left-panel">
+    <!-- Upload zone -->
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tiff" />
+      <div class="upload-icon">📄</div>
+      <h2>Tap to add files</h2>
+      <p>Upload PDFs and images to compile<br>into a single PDF document</p>
+      <div class="supported">
+        <span class="tag">PDF</span>
+        <span class="tag">PNG</span>
+        <span class="tag">JPG</span>
+        <span class="tag">WEBP</span>
+        <span class="tag">BMP</span>
+        <span class="tag">GIF</span>
+      </div>
+    </div>
+
+    <!-- Document list -->
+    <div id="doc-list-container">
+      <div class="list-header">
+        <div>
+          <h3>Document Stack</h3>
+          <span id="list-subtitle">Hold &amp; drag ⠿ to reorder</span>
+        </div>
+        <button class="add-more-btn">
+          + Add more
+          <input type="file" id="add-more-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tiff" />
+        </button>
+      </div>
+      <ul id="doc-list"></ul>
+    </div>
+  </div>
+
+  <!-- Sidebar / bottom panel -->
+  <aside class="sidebar">
+    <div>
+      <h3>Output Settings</h3>
+      <div class="field">
+        <label for="output-name">Output filename</label>
+        <input type="text" id="output-name" placeholder="compiled-document" autocomplete="off" />
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <h3>Stack Summary</h3>
+      <div class="stats">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-files">0</div>
+          <div class="stat-label">Files</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-size">0 KB</div>
+          <div class="stat-label">Total size</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="progress-wrap">
+      <div class="progress-label">
+        <span id="progress-text">Processing…</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+    </div>
+
+    <button class="convert-btn" id="convert-btn" disabled>
+      Compile to PDF
+    </button>
+
+    <p class="hint">All processing happens locally in your browser. No files are uploaded to any server.</p>
+  </aside>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  const { PDFDocument } = PDFLib;
+
+  let docs = [];
+  let dragSrcIndex = null;
+
+  const uploadZone   = document.getElementById('upload-zone');
+  const fileInput    = document.getElementById('file-input');
+  const addMoreInput = document.getElementById('add-more-input');
+  const docList      = document.getElementById('doc-list');
+  const docListCont  = document.getElementById('doc-list-container');
+  const convertBtn   = document.getElementById('convert-btn');
+  const outputName   = document.getElementById('output-name');
+  const statFiles    = document.getElementById('stat-files');
+  const statSize     = document.getElementById('stat-size');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressText = document.getElementById('progress-text');
+  const progressPct  = document.getElementById('progress-pct');
+  const progressFill = document.getElementById('progress-fill');
+  const listSubtitle = document.getElementById('list-subtitle');
+
+  function fileIcon(type) {
+    if (type === 'pdf') return '📕';
+    if (['png','jpg','jpeg','gif','webp','bmp','tiff'].includes(type)) return '🖼️';
+    return '📄';
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  async function getPdfPageCount(file) {
+    return new Promise(resolve => {
+      const r = new FileReader();
+      r.onload = async e => {
+        try { resolve((await pdfjsLib.getDocument({ data: e.target.result }).promise).numPages); }
+        catch { resolve(1); }
+      };
+      r.readAsArrayBuffer(file);
+    });
+  }
+
+  async function addFiles(files) {
+    for (const file of files) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!['pdf','png','jpg','jpeg','gif','webp','bmp','tiff'].includes(ext)) continue;
+      const pageCount = ext === 'pdf' ? await getPdfPageCount(file) : 1;
+      docs.push({ id: Date.now() + Math.random(), file, name: file.name, type: ext, size: file.size, pageCount });
+    }
+    renderList();
+  }
+
+  function renderList() {
+    docList.innerHTML = '';
+    const has = docs.length > 0;
+    uploadZone.style.display = has ? 'none' : 'flex';
+    docListCont.classList.toggle('visible', has);
+    convertBtn.disabled = !has;
+
+    let total = 0;
+    docs.forEach(d => total += d.size);
+    statFiles.textContent = docs.length;
+    statSize.textContent = fmtSize(total);
+    listSubtitle.textContent = docs.length === 1 ? '1 file' : `${docs.length} files · hold ⠿ to reorder`;
+
+    docs.forEach((doc, i) => {
+      const li = document.createElement('li');
+      li.className = 'doc-item';
+      li.dataset.index = i;
+      li.innerHTML = `
+        <span class="drag-handle" data-handle="true">⠿</span>
+        <span class="doc-index">${String(i+1).padStart(2,'0')}</span>
+        <span class="doc-icon">${fileIcon(doc.type)}</span>
+        <div class="doc-info">
+          <div class="doc-name" title="${doc.name}">${doc.name}</div>
+          <div class="doc-meta">${doc.type.toUpperCase()} · ${fmtSize(doc.size)}${doc.type==='pdf'?` · ${doc.pageCount}p`:''}</div>
+        </div>
+        <button class="doc-remove" data-index="${i}">×</button>
+      `;
+
+      // ── Mouse drag events
+      li.addEventListener('dragstart', onDragStart);
+      li.addEventListener('dragover',  onDragOver);
+      li.addEventListener('dragleave', onDragLeave);
+      li.addEventListener('drop',      onDrop);
+      li.addEventListener('dragend',   onDragEnd);
+
+      // ── Touch drag events (on handle only)
+      const handle = li.querySelector('.drag-handle');
+      handle.addEventListener('touchstart', onTouchStart, { passive: false });
+
+      docList.appendChild(li);
+    });
+
+    docList.querySelectorAll('.doc-remove').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        docs.splice(parseInt(btn.dataset.index), 1);
+        renderList();
+      });
+    });
+
+    // Enable draggable only on desktop (touch handled separately)
+    docList.querySelectorAll('.doc-item').forEach(el => {
+      el.draggable = !('ontouchstart' in window);
+    });
+  }
+
+  // ── Mouse drag
+  function onDragStart(e) {
+    dragSrcIndex = parseInt(this.dataset.index);
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    docList.querySelectorAll('.doc-item').forEach(el => el.classList.remove('drag-target'));
+    this.classList.add('drag-target');
+  }
+
+  function onDragLeave() { this.classList.remove('drag-target'); }
+
+  function onDrop(e) {
+    e.preventDefault();
+    const target = parseInt(this.dataset.index);
+    if (dragSrcIndex !== null && dragSrcIndex !== target) {
+      const moved = docs.splice(dragSrcIndex, 1)[0];
+      docs.splice(target, 0, moved);
+      renderList();
+    }
+  }
+
+  function onDragEnd() {
+    docList.querySelectorAll('.doc-item').forEach(el => el.classList.remove('dragging','drag-target'));
+    dragSrcIndex = null;
+  }
+
+  // ── Touch drag reorder
+  let touchDragIndex = null;
+  let ghost = null;
+  let touchOffsetY = 0;
+
+  function onTouchStart(e) {
+    e.preventDefault();
+    const li = e.currentTarget.closest('.doc-item');
+    touchDragIndex = parseInt(li.dataset.index);
+    const touch = e.touches[0];
+
+    // Build ghost
+    ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    ghost.innerHTML = li.innerHTML;
+    ghost.style.width = li.offsetWidth + 'px';
+    document.body.appendChild(ghost);
+
+    const rect = li.getBoundingClientRect();
+    touchOffsetY = touch.clientY - rect.top;
+
+    positionGhost(touch.clientX, touch.clientY);
+    li.classList.add('dragging');
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend',  onTouchEnd);
+    document.addEventListener('touchcancel', onTouchEnd);
+  }
+
+  function positionGhost(cx, cy) {
+    if (!ghost) return;
+    ghost.style.left = '20px';
+    ghost.style.top  = (cy - touchOffsetY) + 'px';
+  }
+
+  function onTouchMove(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    positionGhost(touch.clientX, touch.clientY);
+
+    // Find which item we're hovering over
+    ghost.style.visibility = 'hidden';
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    ghost.style.visibility = 'visible';
+
+    const target = el ? el.closest('.doc-item') : null;
+    docList.querySelectorAll('.doc-item').forEach(li => li.classList.remove('drag-target'));
+    if (target && target !== docList.children[touchDragIndex]) {
+      target.classList.add('drag-target');
+    }
+  }
+
+  function onTouchEnd(e) {
+    document.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('touchend',  onTouchEnd);
+    document.removeEventListener('touchcancel', onTouchEnd);
+
+    if (ghost) { ghost.remove(); ghost = null; }
+
+    // Find drop target
+    const touch = e.changedTouches[0];
+    ghost = null;
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const target = el ? el.closest('.doc-item') : null;
+
+    docList.querySelectorAll('.doc-item').forEach(li => {
+      li.classList.remove('dragging', 'drag-target');
+    });
+
+    if (target) {
+      const targetIndex = parseInt(target.dataset.index);
+      if (touchDragIndex !== null && touchDragIndex !== targetIndex) {
+        const moved = docs.splice(touchDragIndex, 1)[0];
+        docs.splice(targetIndex, 0, moved);
+        renderList();
+      }
+    }
+
+    touchDragIndex = null;
+  }
+
+  // ── Upload zone events
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    addFiles(Array.from(e.dataTransfer.files));
+  });
+
+  fileInput.addEventListener('change', () => { addFiles(Array.from(fileInput.files)); fileInput.value = ''; });
+  addMoreInput.addEventListener('change', () => { addFiles(Array.from(addMoreInput.files)); addMoreInput.value = ''; });
+
+  // ── Toast
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    setTimeout(() => { t.className = ''; }, 3500);
+  }
+
+  // ── Progress
+  function setProgress(pct, label) {
+    progressFill.style.width = pct + '%';
+    progressPct.textContent = pct + '%';
+    progressText.textContent = label;
+  }
+
+  function readFileBuffer(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = rej;
+      r.readAsArrayBuffer(file);
+    });
+  }
+
+  function imageToBytes(file) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.toBlob(blob => {
+          URL.revokeObjectURL(url);
+          if (!blob) return rej(new Error('Canvas conversion failed'));
+          const r = new FileReader();
+          r.onload = e => res({ bytes: new Uint8Array(e.target.result), w: img.naturalWidth, h: img.naturalHeight });
+          r.onerror = rej;
+          r.readAsArrayBuffer(blob);
+        }, 'image/png');
+      };
+      img.onerror = rej;
+      img.src = url;
+    });
+  }
+
+  // ── Compile
+  convertBtn.addEventListener('click', async () => {
+    if (!docs.length) return;
+    convertBtn.disabled = true;
+    progressWrap.classList.add('visible');
+    setProgress(0, 'Initialising…');
+
+    try {
+      const merged = await PDFDocument.create();
+      const total = docs.length;
+
+      for (let i = 0; i < total; i++) {
+        const doc = docs[i];
+        setProgress(Math.round((i / total) * 90), `Processing ${doc.name}…`);
+
+        if (doc.type === 'pdf') {
+          const buf = await readFileBuffer(doc.file);
+          const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+          const pages = await merged.copyPages(src, src.getPageIndices());
+          pages.forEach(p => merged.addPage(p));
+        } else {
+          const { bytes, w, h } = await imageToBytes(doc.file);
+          const img = await merged.embedPng(bytes);
+          const A4W = 595.28, A4H = 841.89, margin = 40;
+          const scale = Math.min((A4W - margin*2) / w, (A4H - margin*2) / h, 1);
+          const dw = w * scale, dh = h * scale;
+          const page = merged.addPage([A4W, A4H]);
+          page.drawImage(img, { x: (A4W - dw) / 2, y: (A4H - dh) / 2, width: dw, height: dh });
+        }
+      }
+
+      setProgress(95, 'Saving PDF…');
+      const pdfBytes = await merged.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const filename = (outputName.value.trim() || 'compiled-document').replace(/\.pdf$/i, '') + '.pdf';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+
+      setProgress(100, 'Done!');
+      showToast(`✓ ${filename} downloaded`, 'success');
+      setTimeout(() => { progressWrap.classList.remove('visible'); setProgress(0,''); }, 2500);
+    } catch (err) {
+      console.error(err);
+      showToast('Error: ' + err.message, 'error');
+      progressWrap.classList.remove('visible');
+    }
+
+    convertBtn.disabled = false;
+  });
+</script>
+</body>
+</html>
