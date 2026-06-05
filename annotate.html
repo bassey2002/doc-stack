@@ -717,13 +717,21 @@ async function renderPage(num) {
   scale = Math.min(vw / viewport0.width, vh / viewport0.height, 2);
   const viewport = page.getViewport({ scale });
 
-  pdfCanvas.width  = viewport.width;
-  pdfCanvas.height = viewport.height;
-  drawCanvas.width  = viewport.width;
-  drawCanvas.height = viewport.height;
-  stage.style.width  = viewport.width + 'px';
-  stage.style.height = viewport.height + 'px';
+ const dpr = window.devicePixelRatio || 1;
+const viewport = page.getViewport({ scale: scale * dpr });
 
+pdfCanvas.width  = viewport.width;
+pdfCanvas.height = viewport.height;
+pdfCanvas.style.width  = (viewport.width  / dpr) + 'px';
+pdfCanvas.style.height = (viewport.height / dpr) + 'px';
+
+drawCanvas.width  = viewport.width;
+drawCanvas.height = viewport.height;
+drawCanvas.style.width  = (viewport.width  / dpr) + 'px';
+drawCanvas.style.height = (viewport.height / dpr) + 'px';
+
+stage.style.width  = (viewport.width  / dpr) + 'px';
+stage.style.height = (viewport.height / dpr) + 'px';
   const pdfCtx = pdfCanvas.getContext('2d');
   await page.render({ canvasContext: pdfCtx, viewport }).promise;
 
